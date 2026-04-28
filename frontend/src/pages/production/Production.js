@@ -40,6 +40,15 @@ function RawMaterials() {
     } catch (err) { toast.error('Xatolik'); }
   };
 
+  const handleDeleteMaterial = async (m) => {
+    if (!window.confirm(`"${m.name}" xom ashyosini o'chirishni xohlaysizmi?`)) return;
+    try {
+      await api.delete('/production/materials/' + m.id + '/');
+      toast.success("Xom ashyo o'chirildi");
+      load();
+    } catch (err) { toast.error("O'chirib bo'lmadi (retsept yoki kirimda ishlatilgan bo'lishi mumkin)"); }
+  };
+
   const handleAddCat = async (e) => {
     e.preventDefault();
     try {
@@ -116,29 +125,49 @@ function RawMaterials() {
       )}
 
       {showAdd && (
-        <form onSubmit={handleAdd} className="bg-gray-50 p-4 rounded-lg mb-4 grid grid-cols-2 md:grid-cols-3 gap-3">
-          <input placeholder="Xom ashyo nomi" value={form.name}
-            onChange={e => setForm({...form, name: e.target.value})}
-            className="border rounded-lg px-3 py-2" required />
-          <select value={form.category} onChange={e => setForm({...form, category: e.target.value})}
-            className="border rounded-lg px-3 py-2" required>
-            <option value="">Kategoriya tanlang</option>
-            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-          <select value={form.unit} onChange={e => setForm({...form, unit: e.target.value})}
-            className="border rounded-lg px-3 py-2">
-            <option value="kg">Kilogramm</option>
-            <option value="litr">Litr</option>
-            <option value="dona">Dona</option>
-            <option value="paket">Paket</option>
-          </select>
-          <input type="number" step="0.01" placeholder="Min. miqdor (ogohlantirish)" value={form.min_quantity}
-            onChange={e => setForm({...form, min_quantity: e.target.value})}
-            className="border rounded-lg px-3 py-2" />
-          <input type="number" placeholder="1 birlik narxi" value={form.price_per_unit}
-            onChange={e => setForm({...form, price_per_unit: e.target.value})}
-            className="border rounded-lg px-3 py-2" />
-          <button type="submit" className="bg-green-600 text-white rounded-lg px-4 py-2">Saqlash</button>
+        <form onSubmit={handleAdd} className="bg-gray-50 p-4 rounded-lg mb-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div>
+            <label className="text-xs text-gray-600 block mb-1">Xom ashyo nomi *</label>
+            <input placeholder="Masalan: Oliy navli un" value={form.name}
+              onChange={e => setForm({...form, name: e.target.value})}
+              className="border rounded-lg px-3 py-2 w-full" required />
+          </div>
+          <div>
+            <label className="text-xs text-gray-600 block mb-1">Kategoriya *</label>
+            <select value={form.category} onChange={e => setForm({...form, category: e.target.value})}
+              className="border rounded-lg px-3 py-2 w-full" required>
+              <option value="">Kategoriya tanlang</option>
+              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-gray-600 block mb-1">O'lchov birligi</label>
+            <select value={form.unit} onChange={e => setForm({...form, unit: e.target.value})}
+              className="border rounded-lg px-3 py-2 w-full">
+              <option value="kg">Kilogramm (kg)</option>
+              <option value="litr">Litr</option>
+              <option value="dona">Dona</option>
+              <option value="paket">Paket</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-gray-600 block mb-1">Min. miqdor (ogohlantirish chegarasi)</label>
+            <input type="number" step="0.01" placeholder="Masalan: 50" value={form.min_quantity}
+              onChange={e => setForm({...form, min_quantity: e.target.value})}
+              className="border rounded-lg px-3 py-2 w-full" />
+          </div>
+          <div>
+            <label className="text-xs text-gray-600 block mb-1">1 birlik narxi (so'm)</label>
+            <input type="number" placeholder="Masalan: 6500" value={form.price_per_unit}
+              onChange={e => setForm({...form, price_per_unit: e.target.value})}
+              className="border rounded-lg px-3 py-2 w-full" />
+          </div>
+          <div className="flex items-end">
+            <button type="submit" className="bg-green-600 text-white rounded-lg px-4 py-2 w-full hover:bg-green-700">Saqlash</button>
+          </div>
+          <div className="md:col-span-3 text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded p-2">
+            💡 <b>Eslatma:</b> Saqlagandan keyin jadvaldagi <b>"+ Kirim"</b> tugmasi orqali real miqdor (masalan 1000 kg un) qo'shasiz.
+          </div>
         </form>
       )}
 
@@ -222,10 +251,16 @@ function RawMaterials() {
                     )}
                   </td>
                   <td className="p-3 text-center">
-                    <button onClick={() => setShowIncome(m)}
-                      className="text-bread-600 hover:bg-bread-50 px-3 py-1 rounded-lg text-sm">
-                      + Kirim
-                    </button>
+                    <div className="flex items-center justify-center gap-1">
+                      <button onClick={() => setShowIncome(m)}
+                        className="text-bread-600 hover:bg-bread-50 px-3 py-1 rounded-lg text-sm">
+                        + Kirim
+                      </button>
+                      <button onClick={() => handleDeleteMaterial(m)}
+                        className="text-red-600 hover:bg-red-50 px-2 py-1 rounded-lg text-sm" title="O'chirish">
+                        🗑️
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );
