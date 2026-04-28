@@ -21,3 +21,18 @@ if not User.objects.filter(username='admin').exists():
     )
     print('Admin user created')
 "
+
+# Test ma'lumotlarni yuklash (faqat mahsulot bo'lmasa)
+python -c "
+import os, django
+os.environ['DJANGO_SETTINGS_MODULE'] = 'config.settings'
+django.setup()
+from production.models import Product
+if not Product.objects.exists():
+    print('>>> Test ma\'lumotlari yuklanmoqda...')
+    exec(open('seed_data.py').read())
+    exec(open('seed_hr.py').read())
+    print('>>> Test ma\'lumotlari yuklandi!')
+else:
+    print('>>> Test ma\'lumotlari allaqachon mavjud, o\'tkazib yuborildi')
+"
