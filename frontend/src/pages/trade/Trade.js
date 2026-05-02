@@ -1,30 +1,18 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
 import {
   MdShoppingCart, MdDelete, MdAdd, MdRemove, MdHistory,
-  MdReportProblem, MdAssessment, MdPerson, MdAttachMoney
+  MdReportProblem, MdAssessment, MdPerson, MdAttachMoney,
+  MdSearch, MdFileDownload, MdPrint
 } from 'react-icons/md';
+import { downloadExcel, printReceipt } from '../../utils/exports';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
 } from 'recharts';
 
-const COLORS = ['#22c55e', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#84cc16'];
-
-function formatMoney(amount) {
-  return new Intl.NumberFormat('uz-UZ').format(amount) + " so'm";
-}
-
-function todayStr() {
-  return new Date().toISOString().split('T')[0];
-}
-
-function daysAgoStr(n) {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return d.toISOString().split('T')[0];
-}
+import { formatMoney, todayStr, daysAgoStr, CHART_COLORS as COLORS, getErrorMessage } from '../../utils/helpers';
 
 // === Tezkor sotuv ===
 function QuickSale() {
@@ -93,7 +81,7 @@ function QuickSale() {
       setCart([]);
       loadStock();
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Xatolik');
+      toast.error(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -199,43 +187,116 @@ function QuickSale() {
 // === Sotuvlar tarixi ===
 function SalesHistory() {
   const [sales, setSales] = useState([]);
+  const [search, setSearch] = useState('');
+  const [paymentFilter, setPaymentFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   useEffect(() => {
     api.get('/trade/sales/').then(r => setSales(r.data.results || r.data)).catch(() => {});
   }, []);
 
+  const filtered = useMemo(() => {
+    return sales.filter(s => {
+      if (paymentFilter && s.payment_type !== paymentFilter) return false;
+      if (dateFrom && new Date(s.date) < new Date(dateFrom)) return false;
+      if (dateTo && new Date(s.date) > new Date(dateTo + 'T23:59:59')) return false;
+      if (search) {
+        const q = search.toLowerCase();
+        const hit = ('#' + s.id).includes(q) ||
+                    (s.seller_name || '').toLowerCase().includes(q) ||
+                    String(s.total_amount).includes(q);
+        if (!hit) return false;
+      }
+      return true;
+    });
+  }, [sales, search, paymentFilter, dateFrom, dateTo]);
+
+  const totalSum = filtered.reduce((s, x) => s + parseFloat(x.total_amount || 0), 0);
+
+  const handleExport = () => {
+    const params = {};
+    if (dateFrom) params.date_from = dateFrom;
+    if (dateTo) params.date_to = dateTo;
+    downloadExcel('/trade/export/sales/', `sotuvlar_${dateFrom || 'all'}_${dateTo || 'all'}.xlsx`, params);
+  };
+
   return (
-    <div className="bg-white rounded-xl shadow-sm overflow-hidden border">
-      <table className="w-full">
-        <thead className="bg-gray-50">
-          <tr>
-            <th className="text-left p-3 text-sm font-medium text-gray-600">#</th>
-            <th className="text-left p-3 text-sm font-medium text-gray-600">Sana</th>
-            <th className="text-left p-3 text-sm font-medium text-gray-600">Sotuvchi</th>
-            <th className="text-left p-3 text-sm font-medium text-gray-600">To'lov</th>
-            <th className="text-right p-3 text-sm font-medium text-gray-600">Summa</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sales.map(s => (
-            <tr key={s.id} className="border-t hover:bg-gray-50">
-              <td className="p-3 text-gray-500">#{s.id}</td>
-              <td className="p-3">{new Date(s.date).toLocaleString('uz-UZ')}</td>
-              <td className="p-3">{s.seller_name || '-'}</td>
-              <td className="p-3">
-                <span className={'px-2 py-1 text-xs rounded-full ' +
-                  (s.payment_type === 'cash' ? 'bg-green-100 text-green-700' :
-                   s.payment_type === 'terminal' ? 'bg-blue-100 text-blue-700' :
-                   'bg-purple-100 text-purple-700')}>{s.payment_type_display}</span>
-              </td>
-              <td className="p-3 text-right font-semibold">{formatMoney(s.total_amount)}</td>
+    <div>
+      {/* Filter panel */}
+      <div className="bg-white rounded-xl shadow-sm border p-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+          <div className="md:col-span-2 relative">
+            <MdSearch className="absolute left-3 top-3 text-gray-400" />
+            <input placeholder="Qidirish (chek №, sotuvchi, summa)..." value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="border rounded-lg pl-10 pr-3 py-2 w-full" />
+          </div>
+          <select value={paymentFilter} onChange={e => setPaymentFilter(e.target.value)}
+            className="border rounded-lg px-3 py-2">
+            <option value="">Barcha to'lovlar</option>
+            <option value="cash">Naqd</option>
+            <option value="terminal">Terminal</option>
+            <option value="click">Click</option>
+            <option value="payme">Payme</option>
+          </select>
+          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+            className="border rounded-lg px-3 py-2" placeholder="Dan" />
+          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+            className="border rounded-lg px-3 py-2" placeholder="Gacha" />
+        </div>
+        <div className="flex justify-between items-center mt-3 flex-wrap gap-2">
+          <div className="text-sm text-gray-600">
+            Topildi: <b>{filtered.length}</b> sotuv · Jami: <b className="text-bread-700">{formatMoney(totalSum)}</b>
+          </div>
+          <button onClick={handleExport}
+            className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm">
+            <MdFileDownload /> Excel'ga yuklash
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden border">
+        <table className="w-full">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="text-left p-3 text-sm font-medium text-gray-600">#</th>
+              <th className="text-left p-3 text-sm font-medium text-gray-600">Sana</th>
+              <th className="text-left p-3 text-sm font-medium text-gray-600">Sotuvchi</th>
+              <th className="text-left p-3 text-sm font-medium text-gray-600">To'lov</th>
+              <th className="text-right p-3 text-sm font-medium text-gray-600">Summa</th>
+              <th className="text-center p-3 text-sm font-medium text-gray-600">Chek</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-      {sales.length === 0 && (
-        <p className="text-center text-gray-400 py-8">Sotuvlar tarixi bo'sh</p>
-      )}
+          </thead>
+          <tbody>
+            {filtered.map(s => (
+              <tr key={s.id} className="border-t hover:bg-gray-50">
+                <td className="p-3 text-gray-500">#{s.id}</td>
+                <td className="p-3">{new Date(s.date).toLocaleString('uz-UZ')}</td>
+                <td className="p-3">{s.seller_name || '-'}</td>
+                <td className="p-3">
+                  <span className={'px-2 py-1 text-xs rounded-full ' +
+                    (s.payment_type === 'cash' ? 'bg-green-100 text-green-700' :
+                     s.payment_type === 'terminal' ? 'bg-blue-100 text-blue-700' :
+                     'bg-purple-100 text-purple-700')}>{s.payment_type_display}</span>
+                </td>
+                <td className="p-3 text-right font-semibold">{formatMoney(s.total_amount)}</td>
+                <td className="p-3 text-center">
+                  <button onClick={() => printReceipt(s)}
+                    className="text-bread-600 hover:bg-bread-50 px-2 py-1 rounded text-sm flex items-center gap-1 mx-auto">
+                    <MdPrint /> Chop etish
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {filtered.length === 0 && (
+          <p className="text-center text-gray-400 py-8">
+            {sales.length === 0 ? "Sotuvlar tarixi bo'sh" : "Filterga mos sotuv topilmadi"}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
@@ -263,7 +324,7 @@ function Brak() {
       setForm({ product: '', quantity: '', reason: 'burnt', note: '' });
       load();
     } catch (err) {
-      toast.error('Xatolik');
+      toast.error(getErrorMessage(err));
     }
   };
 

@@ -12,5 +12,6 @@ router.register('daily-production', views.DailyProductionViewSet)
 router.register('stock', views.FinishedProductStockViewSet)
 
 urlpatterns = [
+    path('export/materials/', views.export_materials_excel, name='export-materials-excel'),
     path('', include(router.urls)),
 ]

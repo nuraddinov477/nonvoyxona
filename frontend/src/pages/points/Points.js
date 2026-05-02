@@ -3,15 +3,11 @@ import api from '../../api/axios';
 import toast from 'react-hot-toast';
 import {
   MdAdd, MdSend, MdCheck, MdLocalShipping, MdStorefront,
-  MdInventory, MdAssessment, MdAssignmentReturn, MdWarning,
+  MdAssignmentReturn, MdWarning,
   MdPerson, MdClose, MdLocationOn, MdPhone
 } from 'react-icons/md';
 
-function formatMoney(amount) {
-  return new Intl.NumberFormat('uz-UZ').format(amount) + " so'm";
-}
-
-function todayStr() { return new Date().toISOString().split('T')[0]; }
+import { formatMoney, todayStr, getErrorMessage } from '../../utils/helpers';
 
 // === Nuqtalar ro'yxati ===
 function PointsList({ onSelectPoint }) {
@@ -33,7 +29,7 @@ function PointsList({ onSelectPoint }) {
       setShowAdd(false);
       setForm({ name: '', address: '', phone: '' });
       load();
-    } catch (err) { toast.error('Xatolik'); }
+    } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
   return (
@@ -357,7 +353,7 @@ function Transfers() {
       await api.post('/points/transfers/' + id + '/accept/');
       toast.success('Qabul qilindi - mahsulot nuqta omboriga o\'tdi');
       load();
-    } catch (err) { toast.error('Xatolik'); }
+    } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
   const inTransitCount = transfers.filter(t => t.status === 'in_transit').length;
@@ -508,7 +504,7 @@ function Returns() {
       setShowAdd(false);
       setForm({ point: '', product: '', quantity: '', reason: '' });
       load();
-    } catch (err) { toast.error('Xatolik'); }
+    } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
   const totalReturns = returns.reduce((s, r) => s + r.quantity, 0);

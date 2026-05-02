@@ -10,26 +10,12 @@ import {
   PieChart, Pie, Cell, AreaChart, Area, Legend, LineChart, Line, ComposedChart
 } from 'recharts';
 
-const COLORS = ['#22c55e', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#6366f1'];
+import { formatMoney as formatMoneyFull, todayStr, daysAgoStr, CHART_COLORS as COLORS } from '../../utils/helpers';
 
 function formatMoney(amount) {
   if (amount >= 1_000_000) return (amount / 1_000_000).toFixed(1) + ' mln';
   if (amount >= 1_000) return Math.round(amount / 1_000) + 'k';
   return new Intl.NumberFormat('uz-UZ').format(amount);
-}
-
-function formatMoneyFull(amount) {
-  return new Intl.NumberFormat('uz-UZ').format(amount) + " so'm";
-}
-
-function todayStr() {
-  return new Date().toISOString().split('T')[0];
-}
-
-function daysAgoStr(n) {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return d.toISOString().split('T')[0];
 }
 
 function StatCard({ title, value, subtitle, icon: Icon, color, trend }) {

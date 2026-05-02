@@ -3,24 +3,14 @@ import api from '../../api/axios';
 import toast from 'react-hot-toast';
 import {
   MdAccountBalanceWallet, MdSwapHoriz, MdPeople, MdAdd,
-  MdAssessment, MdCategory, MdLocalShipping, MdHistory, MdClose, MdPayment
+  MdAssessment, MdCategory, MdClose, MdPayment
 } from 'react-icons/md';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, LineChart, Line
 } from 'recharts';
 
-const COLORS = ['#22c55e', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899'];
-
-function formatMoney(amount) {
-  return new Intl.NumberFormat('uz-UZ').format(amount) + " so'm";
-}
-
-function todayStr() { return new Date().toISOString().split('T')[0]; }
-function firstDayOfMonth() {
-  const d = new Date();
-  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
-}
+import { formatMoney, todayStr, firstDayOfMonth, CHART_COLORS as COLORS, getErrorMessage } from '../../utils/helpers';
 
 // === Kassalar ===
 function CashRegisters() {
@@ -59,7 +49,7 @@ function CashRegisters() {
       setShowAdd(false);
       setForm({ name: '', type: 'main', balance: 0 });
       load();
-    } catch (err) { toast.error('Xatolik'); }
+    } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
   const totalBalance = registers.reduce((s, r) => s + parseFloat(r.balance), 0);
@@ -178,7 +168,7 @@ function Transactions() {
       setShowAdd(false);
       setForm({ cash_register: '', type: 'expense', amount: '', description: '', category: '' });
       load();
-    } catch (err) { toast.error('Xatolik'); }
+    } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
   const filteredCats = categories.filter(c => c.type === form.type);
@@ -340,7 +330,7 @@ function Categories() {
       setShowAdd(false);
       setForm({ name: '', type: 'expense' });
       load();
-    } catch (err) { toast.error('Xatolik'); }
+    } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
   const handleDelete = async (id) => {
@@ -349,7 +339,7 @@ function Categories() {
       await api.delete('/accounting/transaction-categories/' + id + '/');
       toast.success("O'chirildi");
       load();
-    } catch (err) { toast.error('Xatolik'); }
+    } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
   const expenseCats = categories.filter(c => c.type === 'expense');
@@ -441,7 +431,7 @@ function Suppliers() {
       setShowAdd(false);
       setForm({ name: '', phone: '' });
       load();
-    } catch (err) { toast.error('Xatolik'); }
+    } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
   const handlePayment = async (e) => {
@@ -455,7 +445,7 @@ function Suppliers() {
       setPaymentModal(null);
       setPaymentForm({ amount: '', description: '', is_payment: true });
       load();
-    } catch (err) { toast.error('Xatolik'); }
+    } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
   const items = activeTab === 'creditors' ? creditors : debtors;
@@ -714,11 +704,11 @@ function ProfitLoss() {
           <div className="mt-3 text-sm text-gray-700 space-y-2">
             <p><strong>P&L (Profit & Loss Statement)</strong> — bu biznesning ma'lum bir davrdagi moliyaviy natijasini ko'rsatuvchi asosiy hisobot. Quyidagi formula bo'yicha hisoblanadi:</p>
             <div className="bg-white p-3 rounded-lg font-mono text-sm">
-              <p>Tushum (Revenue) <span className="text-gray-400">// barcha sotuvlar</span></p>
-              <p className="text-red-600">− Tannarx (COGS) <span className="text-gray-400">// xom ashyo qiymati</span></p>
+              <p>Tushum (Revenue) <span className="text-gray-400">— barcha sotuvlar</span></p>
+              <p className="text-red-600">− Tannarx (COGS) <span className="text-gray-400">— xom ashyo qiymati</span></p>
               <p className="text-blue-600 font-bold border-t mt-1 pt-1">= Yalpi foyda (Gross Profit)</p>
               <p className="text-purple-600">+ Boshqa kirimlar</p>
-              <p className="text-red-600">− Operatsion xarajatlar <span className="text-gray-400">// ish haqi, kommunal</span></p>
+              <p className="text-red-600">− Operatsion xarajatlar <span className="text-gray-400">— ish haqi, kommunal</span></p>
               <p className="text-green-700 font-bold border-t-2 mt-1 pt-1">= ⭐ SOF FOYDA (Net Profit)</p>
             </div>
             <p>💡 <strong>Maslahat:</strong> Har bir kartada <strong>?</strong> tugmasini bosib, batafsil tushuntirish va misolni ko'rishingiz mumkin.</p>

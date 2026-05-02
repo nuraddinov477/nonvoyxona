@@ -5,8 +5,10 @@ from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 from django.db import transaction as db_transaction
 from django.db.models import Sum
+from django.http import HttpResponse
 from django.utils import timezone
 from datetime import datetime, timedelta
+from io import BytesIO
 from .models import (Position, Employee, PieceworkRate, Attendance,
                      Bonus, Penalty, Advance, SalaryPayment)
 from .serializers import (PositionSerializer, EmployeeSerializer, CreateEmployeeSerializer,
@@ -271,3 +273,62 @@ def hr_dashboard(request):
         'pending_salary': pending_salary,
         'advances_this_month': advances_total,
     })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def export_salaries_excel(request):
+    """Maoshlarni Excel'ga eksport"""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+
+    month = request.GET.get('month', timezone.localdate().strftime('%Y-%m'))
+    payments = SalaryPayment.objects.filter(month=month).select_related('employee__user', 'employee__position')
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = f"Maoshlar {month}"
+
+    headers = ['#', 'Xodim', 'Lavozim', 'Asosiy maosh', 'Ishbay', 'Mukofot', 'Shtraf', 'Avans', "To'lanishi kerak", 'Holat']
+    ws.append(headers)
+    for cell in ws[1]:
+        cell.font = Font(bold=True, color='FFFFFF')
+        cell.fill = PatternFill('solid', fgColor='8B4513')
+        cell.alignment = Alignment(horizontal='center')
+
+    total = 0
+    for i, p in enumerate(payments, 1):
+        emp = p.employee
+        ws.append([
+            i,
+            emp.user.get_full_name() or emp.user.username,
+            emp.position.name if emp.position else '-',
+            float(p.base_salary),
+            float(p.piecework_amount),
+            float(p.bonus_total),
+            float(p.penalty_total),
+            float(p.advance_total),
+            float(p.total_to_pay),
+            "To'langan" if p.status == 'paid' else 'Kutilmoqda',
+        ])
+        total += float(p.total_to_pay)
+
+    ws.append([])
+    ws.append(['', '', '', '', '', '', '', 'JAMI:', total, ''])
+    for cell in ws[ws.max_row]:
+        cell.font = Font(bold=True)
+
+    widths = [5, 25, 18, 14, 14, 12, 12, 12, 16, 12]
+    for i, w in enumerate(widths, 1):
+        ws.column_dimensions[chr(64 + i)].width = w
+
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    response = HttpResponse(
+        buffer.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename="maoshlar_{month}.xlsx"'
+    return response

@@ -3,18 +3,12 @@ import api from '../../api/axios';
 import toast from 'react-hot-toast';
 import {
   MdPeople, MdAccessTime, MdAttachMoney, MdPayment, MdCalculate,
-  MdAdd, MdClose, MdCheck, MdSick, MdBeachAccess, MdCancel, MdLogin
+  MdAdd, MdClose, MdCheck, MdSick, MdBeachAccess, MdCancel, MdLogin,
+  MdSearch, MdFileDownload
 } from 'react-icons/md';
 
-function formatMoney(amount) {
-  return new Intl.NumberFormat('uz-UZ').format(amount) + " so'm";
-}
-
-function todayStr() { return new Date().toISOString().split('T')[0]; }
-function currentMonth() {
-  const d = new Date();
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-}
+import { formatMoney, todayStr, currentMonth, getErrorMessage } from '../../utils/helpers';
+import { downloadExcel } from '../../utils/exports';
 
 const STATUS_LABELS = {
   active: { label: '✅ Aktiv', color: 'bg-green-100 text-green-700' },
@@ -67,13 +61,25 @@ function Employees() {
     }
   };
 
-  const filtered = filter ? employees.filter(e => e.status === filter) : employees;
+  const [search, setSearch] = useState('');
+  const filtered = employees.filter(e => {
+    if (filter && e.status !== filter) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      const name = ((e.user?.first_name || '') + ' ' + (e.user?.last_name || '')).toLowerCase();
+      const username = (e.user?.username || '').toLowerCase();
+      const phone = (e.user?.phone || '').toLowerCase();
+      const position = (e.position_name || '').toLowerCase();
+      if (!name.includes(q) && !username.includes(q) && !phone.includes(q) && !position.includes(q)) return false;
+    }
+    return true;
+  });
 
   return (
     <div>
       <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
         <h2 className="text-lg font-semibold">Xodimlar bazasi ({filtered.length})</h2>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <select value={filter} onChange={e => setFilter(e.target.value)}
             className="border rounded-lg px-3 py-2 text-sm">
             <option value="">Barchasi</option>
@@ -87,6 +93,13 @@ function Employees() {
             <MdAdd /> Yangi xodim
           </button>
         </div>
+      </div>
+
+      <div className="relative mb-4">
+        <MdSearch className="absolute left-3 top-3 text-gray-400" />
+        <input placeholder="Ism, login, telefon yoki lavozim bo'yicha qidirish..." value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="border rounded-lg pl-10 pr-3 py-2 w-full text-sm" />
       </div>
 
       {showAdd && (
@@ -199,7 +212,7 @@ function AttendanceTab() {
       });
       toast.success('Belgilandi');
       load();
-    } catch (err) { toast.error('Xatolik'); }
+    } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
   return (
@@ -326,7 +339,7 @@ function BonusPenalty() {
       setShowAdd(false);
       setForm({ employee: '', amount: '', reason: '', month: currentMonth() });
       load();
-    } catch (err) { toast.error('Xatolik'); }
+    } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
   const items = activeTab === 'bonus' ? bonuses : penalties;
@@ -444,7 +457,7 @@ function Advances() {
       setShowAdd(false);
       setForm({ employee: '', amount: '', month: currentMonth(), cash_register: '', description: '' });
       load();
-    } catch (err) { toast.error('Xatolik'); }
+    } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
   const total = advances.reduce((s, a) => s + parseFloat(a.amount), 0);
@@ -542,7 +555,7 @@ function Salaries() {
       const res = await api.post('/hr/salary-payments/calculate/', { month });
       toast.success(res.data.count + " ta xodim uchun maosh hisoblandi");
       load();
-    } catch (err) { toast.error('Xatolik'); }
+    } catch (err) { toast.error(getErrorMessage(err)); }
     finally { setCalculating(false); }
   };
 
@@ -566,10 +579,16 @@ function Salaries() {
         <span className="font-medium">📅 Oy:</span>
         <input type="month" value={month} onChange={e => setMonth(e.target.value)}
           className="border rounded-lg px-3 py-2" />
-        <button onClick={handleCalculate} disabled={calculating}
-          className="ml-auto flex items-center gap-2 bg-bread-600 text-white px-4 py-2 rounded-lg hover:bg-bread-700 disabled:opacity-50">
-          <MdCalculate /> {calculating ? 'Hisoblanmoqda...' : 'Maosh hisoblash'}
-        </button>
+        <div className="ml-auto flex gap-2 flex-wrap">
+          <button onClick={() => downloadExcel('/hr/export/salaries/', `maoshlar_${month}.xlsx`, { month })}
+            className="flex items-center gap-1 bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 text-sm">
+            <MdFileDownload /> Excel
+          </button>
+          <button onClick={handleCalculate} disabled={calculating}
+            className="flex items-center gap-2 bg-bread-600 text-white px-4 py-2 rounded-lg hover:bg-bread-700 disabled:opacity-50">
+            <MdCalculate /> {calculating ? 'Hisoblanmoqda...' : 'Maosh hisoblash'}
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">

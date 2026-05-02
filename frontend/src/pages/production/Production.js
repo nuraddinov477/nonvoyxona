@@ -1,21 +1,23 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
 import {
   MdAdd, MdInventory, MdReceipt, MdFactory, MdMenuBook,
-  MdLocalShipping, MdStorefront, MdDelete, MdWarning, MdDashboard
+  MdLocalShipping, MdStorefront, MdDelete, MdWarning, MdDashboard,
+  MdSearch, MdFileDownload
 } from 'react-icons/md';
 import Dashboard from '../dashboard/Dashboard';
-
-function formatMoney(amount) {
-  return new Intl.NumberFormat('uz-UZ').format(amount) + " so'm";
-}
+import { formatMoney, getErrorMessage } from '../../utils/helpers';
+import { downloadExcel } from '../../utils/exports';
 
 // === Xom ashyo ombori ===
 function RawMaterials() {
   const [materials, setMaterials] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
   const [showIncome, setShowIncome] = useState(null);
+  const [search, setSearch] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
   const [categories, setCategories] = useState([]);
   const [showCatAdd, setShowCatAdd] = useState(false);
   const [catForm, setCatForm] = useState({ name: '' });
@@ -37,7 +39,7 @@ function RawMaterials() {
       setShowAdd(false);
       setForm({ name: '', category: '', unit: 'kg', min_quantity: 0, price_per_unit: 0 });
       load();
-    } catch (err) { toast.error('Xatolik'); }
+    } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
   const handleDeleteMaterial = async (m) => {
@@ -57,7 +59,7 @@ function RawMaterials() {
       setShowCatAdd(false);
       setCatForm({ name: '' });
       load();
-    } catch (err) { toast.error('Xatolik'); }
+    } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
   const handleIncome = async (e) => {
@@ -73,7 +75,7 @@ function RawMaterials() {
       setShowIncome(null);
       setIncomeForm({ quantity: '', price_per_unit: '', supplier: '' });
       load();
-    } catch (err) { toast.error('Xatolik'); }
+    } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
   const lowCount = materials.filter(m => parseFloat(m.quantity) <= parseFloat(m.min_quantity)).length;
@@ -103,7 +105,11 @@ function RawMaterials() {
 
       <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
         <h2 className="text-lg font-semibold">Xom ashyo ombori</h2>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <button onClick={() => downloadExcel('/production/export/materials/', 'xom_ashyolar.xlsx')}
+            className="flex items-center gap-1 bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 text-sm">
+            <MdFileDownload /> Excel
+          </button>
           <button onClick={() => setShowCatAdd(!showCatAdd)}
             className="flex items-center gap-1 bg-gray-200 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-300 text-sm">
             <MdAdd /> Kategoriya
@@ -113,6 +119,27 @@ function RawMaterials() {
             <MdAdd /> Xom ashyo
           </button>
         </div>
+      </div>
+
+      {/* Qidirish va filter */}
+      <div className="bg-white rounded-xl border p-3 mb-4 grid grid-cols-1 md:grid-cols-3 gap-2">
+        <div className="relative">
+          <MdSearch className="absolute left-3 top-3 text-gray-400" />
+          <input placeholder="Nomi bo'yicha qidirish..." value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="border rounded-lg pl-10 pr-3 py-2 w-full text-sm" />
+        </div>
+        <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)}
+          className="border rounded-lg px-3 py-2 text-sm">
+          <option value="">Barcha kategoriyalar</option>
+          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+          className="border rounded-lg px-3 py-2 text-sm">
+          <option value="">Barcha holatlar</option>
+          <option value="low">⚠ Kam qolgan</option>
+          <option value="ok">✅ Yetarli</option>
+        </select>
       </div>
 
       {showCatAdd && (
@@ -230,7 +257,14 @@ function RawMaterials() {
             </tr>
           </thead>
           <tbody>
-            {materials.map(m => {
+            {materials.filter(m => {
+              if (search && !m.name.toLowerCase().includes(search.toLowerCase())) return false;
+              if (filterCategory && String(m.category) !== String(filterCategory)) return false;
+              const isLow = parseFloat(m.quantity) <= parseFloat(m.min_quantity);
+              if (filterStatus === 'low' && !isLow) return false;
+              if (filterStatus === 'ok' && isLow) return false;
+              return true;
+            }).map(m => {
               const isLow = parseFloat(m.quantity) <= parseFloat(m.min_quantity);
               return (
                 <tr key={m.id} className={'border-t ' + (isLow ? 'bg-red-50' : 'hover:bg-gray-50')}>
@@ -295,7 +329,7 @@ function ProductsAndStock() {
       setShowAdd(false);
       setForm({ name: '', price: '' });
       load();
-    } catch (err) { toast.error('Xatolik'); }
+    } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
   const totalUnits = products.reduce((s, p) => s + (p.stock_quantity || 0), 0);
@@ -442,7 +476,7 @@ function Recipes() {
       refreshSelected();
       load();
     } catch (err) {
-      toast.error(err.response?.data?.non_field_errors?.[0] || 'Xatolik');
+      toast.error(getErrorMessage(err));
     }
   };
 
@@ -453,7 +487,7 @@ function Recipes() {
       toast.success("O'chirildi");
       refreshSelected();
       load();
-    } catch (err) { toast.error('Xatolik'); }
+    } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
   return (
@@ -582,7 +616,7 @@ function DailyProd() {
       setForm({ date: new Date().toISOString().split('T')[0], product: '', quantity: '' });
       load();
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Xatolik');
+      toast.error(getErrorMessage(err));
     }
   };
 

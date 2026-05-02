@@ -14,5 +14,6 @@ router.register('salary-payments', views.SalaryPaymentViewSet)
 
 urlpatterns = [
     path('summary/', views.hr_dashboard, name='hr-summary'),
+    path('export/salaries/', views.export_salaries_excel, name='export-salaries-excel'),
     path('', include(router.urls)),
 ]

@@ -5,7 +5,9 @@ from rest_framework.response import Response
 from django.db import transaction as db_transaction
 from django.db.models import Sum, Count, Q
 from django.utils import timezone
+from django.http import HttpResponse
 from datetime import datetime, timedelta
+from io import BytesIO
 from .models import Sale, SaleItem, UnsoldProduct
 from .serializers import (SaleSerializer, CreateSaleSerializer,
                           UnsoldProductSerializer)
@@ -171,3 +173,73 @@ def trade_reports(request):
         'unsold_by_reason': unsold_by_reason,
         'hourly': hourly,
     })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def export_sales_excel(request):
+    """Sotuvlarni Excel'ga eksport qilish"""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+
+    today = timezone.localdate()
+    date_from = parse_date(request.GET.get('date_from'), today - timedelta(days=30))
+    date_to = parse_date(request.GET.get('date_to'), today)
+
+    sales = Sale.objects.filter(
+        date__date__gte=date_from, date__date__lte=date_to
+    ).select_related('seller').prefetch_related('items__product').order_by('-date')
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Sotuvlar"
+
+    # Sarlavha
+    headers = ['#', 'Sana', 'Vaqt', 'Sotuvchi', "To'lov turi", 'Mahsulotlar', 'Jami summa']
+    ws.append(headers)
+    header_font = Font(bold=True, color='FFFFFF')
+    header_fill = PatternFill('solid', fgColor='8B4513')
+    for cell in ws[1]:
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal='center')
+
+    payment_labels = {'cash': 'Naqd', 'terminal': 'Terminal', 'click': 'Click', 'payme': 'Payme'}
+
+    total_sum = 0
+    for s in sales:
+        items_str = ', '.join([f"{i.product.name} x{i.quantity}" for i in s.items.all()])
+        ws.append([
+            s.id,
+            s.date.strftime('%d.%m.%Y'),
+            s.date.strftime('%H:%M'),
+            s.seller.get_full_name() if s.seller else '-',
+            payment_labels.get(s.payment_type, s.payment_type),
+            items_str,
+            float(s.total_amount),
+        ])
+        total_sum += float(s.total_amount)
+
+    # Jami qator
+    ws.append([])
+    ws.append(['', '', '', '', '', 'JAMI:', total_sum])
+    last_row = ws.max_row
+    for cell in ws[last_row]:
+        cell.font = Font(bold=True)
+
+    # Ustun kengligi
+    widths = [6, 12, 8, 20, 12, 50, 15]
+    for i, w in enumerate(widths, 1):
+        ws.column_dimensions[chr(64 + i)].width = w
+
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    filename = f"sotuvlar_{date_from}_{date_to}.xlsx"
+    response = HttpResponse(
+        buffer.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
