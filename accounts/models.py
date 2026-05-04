@@ -25,3 +25,16 @@ class User(AbstractUser):
 
     def __str__(self):
         return f"{self.get_full_name()} ({self.get_role_display()})"
+
+
+class Message(models.Model):
+    """Admin va Menejer o'rtasidagi yopiq chat"""
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_messages')
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    read_by = models.ManyToManyField(User, related_name='read_messages', blank=True)
+
+    class Meta:
+        ordering = ['created_at']
+        verbose_name = 'Xabar'
+        verbose_name_plural = 'Xabarlar (Boss chat)'

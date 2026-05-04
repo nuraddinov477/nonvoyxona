@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import api from '../api/axios';
+import BossChat, { ChatButton } from './BossChat';
+import Profile from './Profile';
 import {
   MdDashboard, MdShoppingCart, MdStorefront,
   MdAccountBalance, MdLogout, MdPeople, MdChevronRight,
@@ -32,11 +35,31 @@ function UserAvatar({ user, size = 'md' }) {
 
 export default function Layout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 
   const menuItems = getMenuForRole(user?.role);
+  const canChat = user?.role === 'admin' || user?.role === 'manager';
+
+  const loadUnread = useCallback(() => {
+    if (!canChat) return;
+    api.get('/auth/boss-chat/unread-count/').then(r => setUnreadCount(r.data.count)).catch(() => {});
+  }, [canChat]);
+
+  useEffect(() => {
+    if (!canChat) return;
+    loadUnread();
+    const interval = setInterval(loadUnread, 10000);
+    return () => clearInterval(interval);
+  }, [canChat, loadUnread]);
+
+  useEffect(() => {
+    if (!chatOpen) loadUnread();
+  }, [chatOpen, loadUnread]);
 
   const handleLogout = () => {
     logout();
@@ -105,17 +128,20 @@ export default function Layout({ children }) {
 
         {/* User section */}
         <div className="border-t border-gray-700/60 p-3">
-          <div className={`flex items-center gap-3 mb-2 ${!sidebarOpen && 'justify-center'}`}>
+          <button
+            onClick={() => setProfileOpen(true)}
+            className={`flex items-center gap-3 mb-2 w-full hover:bg-gray-800 rounded-lg p-1 transition-colors ${!sidebarOpen && 'justify-center'}`}
+            title="Profilim">
             <UserAvatar user={user} />
             {sidebarOpen && (
-              <div className="overflow-hidden flex-1">
+              <div className="overflow-hidden flex-1 text-left">
                 <p className="text-sm font-semibold text-white truncate">
                   {user?.first_name} {user?.last_name}
                 </p>
                 <p className="text-xs text-gray-400 truncate">{user?.role_display}</p>
               </div>
             )}
-          </div>
+          </button>
           <button
             onClick={handleLogout}
             title={!sidebarOpen ? "Chiqish" : undefined}
@@ -149,10 +175,15 @@ export default function Layout({ children }) {
             })()}
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-400">
+            <span className="text-xs text-gray-400 hidden md:inline">
               {new Date().toLocaleDateString('uz-UZ', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </span>
-            <UserAvatar user={user} size="sm" />
+            {canChat && (
+              <ChatButton onClick={() => setChatOpen(true)} unreadCount={unreadCount} />
+            )}
+            <button onClick={() => setProfileOpen(true)} className="hover:opacity-80" title="Profilim">
+              <UserAvatar user={user} size="sm" />
+            </button>
           </div>
         </header>
 
@@ -160,6 +191,9 @@ export default function Layout({ children }) {
           {children}
         </div>
       </main>
+
+      <BossChat open={chatOpen} onClose={() => setChatOpen(false)} />
+      <Profile open={profileOpen} onClose={() => setProfileOpen(false)} />
     </div>
   );
 }
