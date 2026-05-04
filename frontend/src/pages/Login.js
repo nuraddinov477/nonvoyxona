@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { getMenuForRole } from '../components/Layout';
 import toast from 'react-hot-toast';
 import { MdLock, MdPerson, MdVisibility, MdVisibilityOff } from 'react-icons/md';
 
@@ -16,9 +17,10 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
     try {
-      await login(username, password);
+      const data = await login(username, password);
       toast.success('Tizimga xush kelibsiz!');
-      navigate('/');
+      const menu = getMenuForRole(data.user?.role);
+      navigate(menu[0]?.path || '/');
     } catch {
       toast.error("Login yoki parol noto'g'ri");
     } finally {

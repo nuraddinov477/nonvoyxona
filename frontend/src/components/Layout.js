@@ -6,13 +6,18 @@ import {
   MdAccountBalance, MdLogout, MdPeople, MdChevronRight,
 } from 'react-icons/md';
 
-const menuItems = [
-  { path: '/', label: 'Boshqaruv', icon: MdDashboard, color: 'text-emerald-400' },
-  { path: '/trade', label: 'Savdo', icon: MdShoppingCart, color: 'text-blue-400' },
-  { path: '/points', label: 'Nuqtalar', icon: MdStorefront, color: 'text-yellow-400' },
-  { path: '/accounting', label: 'Moliya', icon: MdAccountBalance, color: 'text-purple-400' },
-  { path: '/hr', label: 'Xodimlar (HR)', icon: MdPeople, color: 'text-pink-400' },
+const ALL_MENU_ITEMS = [
+  { path: '/', label: 'Boshqaruv', icon: MdDashboard, color: 'text-emerald-400', roles: ['admin', 'manager', 'baker'] },
+  { path: '/trade', label: 'Savdo', icon: MdShoppingCart, color: 'text-blue-400', roles: ['admin', 'manager', 'seller'] },
+  { path: '/points', label: 'Nuqtalar', icon: MdStorefront, color: 'text-yellow-400', roles: ['admin', 'manager', 'point_seller'] },
+  { path: '/accounting', label: 'Moliya', icon: MdAccountBalance, color: 'text-purple-400', roles: ['admin', 'manager', 'accountant'] },
+  { path: '/hr', label: 'Xodimlar (HR)', icon: MdPeople, color: 'text-pink-400', roles: ['admin', 'manager'] },
 ];
+
+export function getMenuForRole(role) {
+  if (!role) return [];
+  return ALL_MENU_ITEMS.filter(item => item.roles.includes(role));
+}
 
 function UserAvatar({ user, size = 'md' }) {
   const initials = [user?.first_name?.[0], user?.last_name?.[0]]
@@ -30,6 +35,8 @@ export default function Layout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+
+  const menuItems = getMenuForRole(user?.role);
 
   const handleLogout = () => {
     logout();
